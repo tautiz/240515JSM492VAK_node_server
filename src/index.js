@@ -119,6 +119,11 @@ app.put('/todo/:id', async (req, res) => {
         await todo.save(); // Palaukite, kol įrašymas bus baigtas
         res.json({ message: "Elementas atnaujintas", data: todo });
     } catch (err) {
+        // Patikrinkite, ar klaida dėl netinkamo ObjectId
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            res.status(404).json({ error: "Elementas nerastas"});
+            return;
+        }
         res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
     }
 });
