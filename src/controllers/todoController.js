@@ -1,4 +1,5 @@
 const Todo = require('../models/todo');
+const mongoose = require('mongoose');
 
 exports.getAllTodos = async (req, res) => {
     try {
@@ -12,6 +13,9 @@ exports.getAllTodos = async (req, res) => {
 exports.getTodoById = async (req, res) => {
     const id = req.params.id;
     try {
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(404).json({ error: "Netinkamas ID tipas" });
+        }
         const todo = await Todo.findById(id);
         if (!todo) {
             return res.status(404).json({ error: "Elementas nerastas" });
@@ -43,139 +47,130 @@ exports.createTodo = async (req, res) => {
 };
 
 exports.changeStatus = async (req, res) => {
+    try {
+        if (!req.body.status) {
+            return res.status(400).json({ error: "Trūksta statuso lauko" });
+        }
+
+        const todo = await Todo.findById(id);
+        if (!todo) {
+            return res.status(404).json({ error: "Elementas nerastas" });
+        }
+    } catch (err) {
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            return res.status(404).json({ error: "Elementas nerastas" });
+        }
+        return res.status(500).json({ error: "Klaida atnaujinant duomenis" });
+    }
     const id = req.params.id;
     const { status } = req.body;
     await Todo.findByIdAndUpdate(id, { status });
     res.json({ message: "Statusas pakeistas" });
 };
 
-// @todo: PUT / PATCH / DELTE ...
+exports.updateTodo = async (req, res) => {
+    const id = req.params.id;
+    try {
+        const todo = await Todo.findById(id);
+        if (!todo) {
+            return res.status(404).json({ error: "Elementas nerastas" });
+        }
 
-// // Maršrutas visiškai atnaujinti užduotį
-// app.put('/todo/:id', async (req, res) => {
-//     const id = req.params.id;
-//     try {
-//         const todo = await Todo.findById(id);
-//         if (!todo) {
-//             res.status(404).json({ error: "Elementas nerastas" });
-//             return;
-//         }
+        const { title, author, status } = req.body;
+        if (!title || !author || !status) {
+            return res.status(400).json({ error: "Trūksta laukų užklausoje" });
+        }
 
-//         const { title, author, status } = req.body;
+        todo.title = title;
+        todo.author = author; 
+        todo.status = status;
 
-//         // Patikrinkite, ar visi reikalingi laukeliai yra pateikti
-//         if (!title || !author || !status) {
-//             res.status(400).json({ error: "Trūksta laukų užklausoje" });
-//             return;
-//         }
+        await todo.save();
+        res.json({ message: "Elementas atnaujintas", data: todo });
+    } catch (err) {
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            return res.status(404).json({ error: "Elementas nerastas"});
+        }
+        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
+    }
+};
 
-//         // Atnaujinkite užduoties laukus
-//         todo.title = title;
-//         todo.author = author;
-//         todo.status = status;
+exports.partialUpdateTodo = async (req, res) => {
+    const id = req.params.id;
+    try {
+        const todo = await Todo.findById(id);
+        if (!todo) {
+            return res.status(404).json({ error: "Elementas nerastas" });
+        }
 
-//         await todo.save(); // Palaukite, kol įrašymas bus baigtas
-//         res.json({ message: "Elementas atnaujintas", data: todo });
-//     } catch (err) {
-//         // Patikrinkite, ar klaida dėl netinkamo ObjectId
-//         if (err.name === 'CastError' && err.kind === 'ObjectId') {
-//             res.status(404).json({ error: "Elementas nerastas"});
-//             return;
-//         }
-//         res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
-//     }
-// });
+        const { title, author, status } = req.body;
+        
+        if (title) todo.title = title;
+        if (author) todo.author = author;
+        if (status) todo.status = status;
 
-// Maršrutas dalinio užduoties atnaujinimui
-// app.patch('/todo/:id', async (req, res) => {
-//     const id = req.params.id;
-//     try {
-//         const todo = await Todo.findById(id);
-//         if (!todo) {
-//             res.status(404).json({ error: "Elementas nerastas" });
-//             return;
-//         }
+        await todo.save();
+        res.json({ message: "Elementas dalinai atnaujintas", data: todo });
+    } catch (err) {
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            return res.status(404).json({ error: "Elementas nerastas"});
+        }
+        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
+    }
+};
 
-//         const { title, author, status } = req.body;
+exports.deleteTodo = async (req, res) => {
+    const id = req.params.id;
+    try {
+        const todo = await Todo.findByIdAndDelete(id);
+        if (!todo) {
+            return res.status(404).json({ error: "Elementas nerastas" });
+        }
+        res.json({ message: "Elementas ištrintas", data: todo });
+    } catch (err) {
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            return res.status(404).json({ error: "Elementas nerastas"});
+        }
+        res.status(500).json({ error: "Klaida trinant duomenis: " + err.toString() });
+    }
+};
 
-//         // Atnaujinkite tik tuos laukus, kurie pateikti
-//         if (title !== undefined) todo.title = title;
-//         if (author !== undefined) todo.author = author;
-//         if (status !== undefined) todo.status = status;
+exports.markTodoAsDone = async (req, res) => {
+    const id = req.params.id;
+    try {
+        const todo = await Todo.findByIdAndUpdate(
+            id,
+            { status: 'done' },
+            { new: true }
+        );
+        if (!todo) {
+            return res.status(404).json({ error: "Elementas nerastas" });
+        }
+        res.json({ message: "Užduotis pažymėta kaip atlikta", data: todo });
+    } catch (err) {
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            return res.status(404).json({ error: "Elementas nerastas"});
+        }
+        res.status(500).json({ error: "Klaida atnaujinant statusą: " + err.toString() });
+    }
+};
 
-//         await todo.save(); // Palaukite, kol įrašymas bus baigtas
-//         res.json({ message: "Elementas iš dalies atnaujintas", data: todo });
-//     } catch (err) {
-//         // Patikrinkite, ar klaida dėl netinkamo ObjectId
-//         if (err.name === 'CastError' && err.kind === 'ObjectId') {
-//             res.status(404).json({ error: "Elementas nerastas" });
-//             return;
-//         }
-//         res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
-//     }
-// });
-
-// // Maršrutas ištrinti užduotį
-// app.delete('/todo/:id', async (req, res) => {
-//     const id = req.params.id;
-//     try {
-//         const deletedTodo = await Todo.findByIdAndDelete(id);
-//         if (!deletedTodo) {
-//             res.status(404).json({ error: "Elementas nerastas" });
-//             return;
-//         }
-//         res.json({ message: `Elementas ištrintas: ${deletedTodo.title}` });
-//     } catch (err) {
-//         // Patikrinkite, ar klaida dėl netinkamo ObjectId
-//         if (err.name === 'CastError' && err.kind === 'ObjectId') {
-//             res.status(404).json({ error: "Elementas nerastas" });
-//             return;
-//         }
-//         res.status(500).json({ error: "Klaida trinant duomenis: " + err.toString() });
-//     }
-// });
-
-// // Maršrutas pažymėti užduotį kaip atliktą
-// app.post('/todo/:id/done', async (req, res) => {
-//     const id = req.params.id;
-//     try {
-//         const todo = await Todo.findById(id);
-//         if (!todo) {
-//             res.status(404).json({ error: "Elementas nerastas" });
-//             return;
-//         }
-
-//         todo.status = "done";
-//         await todo.save(); // Palaukite, kol įrašymas bus baigtas
-//         res.json({ message: "Darbas atliktas", data: todo });
-//     } catch (err) {
-//         // Patikrinkite, ar klaida dėl netinkamo ObjectId
-//         if (err.name === 'CastError' && err.kind === 'ObjectId') {
-//             res.status(404).json({ error: "Elementas nerastas" });
-//             return;
-//         }
-//         res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
-//     }
-// });
-// // Maršrutas atšaukti užduotį
-// app.post('/todo/:id/cancel', async (req, res) => {
-//     const id = req.params.id;
-//     try {
-//         const todo = await Todo.findById(id);
-//         if (!todo) {
-//             res.status(404).json({ error: "Elementas nerastas" });
-//             return;
-//         }
-
-//         todo.status = "cancelled";
-//         await todo.save();
-//         res.json({ message: "Darbas atšauktas", data: todo });
-//     } catch (err) {
-//         // Patikrinkite, ar klaida dėl netinkamo ObjectId
-//         if (err.name === 'CastError' && err.kind === 'ObjectId') {
-//             res.status(404).json({ error: "Elementas nerastas" });
-//             return;
-//         }
-//         res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
-//     }
-// });
+exports.cancelTodo = async (req, res) => {
+    const id = req.params.id;
+    try {
+        const todo = await Todo.findByIdAndUpdate(
+            id,
+            { status: 'cancelled' },
+            { new: true }
+        );
+        if (!todo) {
+            return res.status(404).json({ error: "Elementas nerastas" });
+        }
+        res.json({ message: "Užduotis atšaukta", data: todo });
+    } catch (err) {
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            return res.status(404).json({ error: "Elementas nerastas"});
+        }
+        res.status(500).json({ error: "Klaida atšaukiant užduotį: " + err.toString() });
+    }
+};
