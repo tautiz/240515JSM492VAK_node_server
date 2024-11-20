@@ -1,3 +1,5 @@
+'use strict';
+
 const mongoose = require('mongoose');
 
 const connectToDatabase = async () => {
@@ -9,8 +11,8 @@ const connectToDatabase = async () => {
 
     try {
         await mongoose.connect(uri, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true
+            // useNewUrlParser: true,
+            // useUnifiedTopology: true
         });
         console.log("Prisijungta prie MongoDB sėkmingai!");
     } catch (error) {

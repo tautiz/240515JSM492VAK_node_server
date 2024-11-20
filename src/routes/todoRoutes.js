@@ -3,15 +3,16 @@ const router = express.Router();
 const todoController = require('../controllers/todoController');
 const { cacheMiddleware } = require('../middlewares/cacheMiddleware');
 const corsHandler = require('../middlewares/corsHandler');
+const auth = require('../middlewares/auth');
 
-router.get('/', corsHandler, todoController.getAllTodos);
-router.get('/:id', corsHandler, cacheMiddleware, todoController.getTodoById);
-router.post('/', corsHandler, todoController.createTodo);
-router.put('/:id', corsHandler, todoController.updateTodo);
-router.patch('/:id', corsHandler, todoController.partialUpdateTodo);
-router.delete('/:id', corsHandler, todoController.deleteTodo);
-router.post('/:id/done', corsHandler,  todoController.markTodoAsDone);
-router.post('/:id/cancel', corsHandler, todoController.cancelTodo);
-router.put('/:id', corsHandler, todoController.changeStatus);
+router.get('/', corsHandler, auth, todoController.getAllTodos);
+router.get('/:id', corsHandler, auth, cacheMiddleware, todoController.getTodoById);
+router.post('/', corsHandler, auth, todoController.createTodo);
+router.put('/:id', corsHandler, auth, todoController.updateTodo);
+router.patch('/:id', corsHandler, auth, todoController.partialUpdateTodo);
+router.delete('/:id', corsHandler, auth, todoController.deleteTodo);
+router.post('/:id/done', corsHandler, auth,  todoController.markTodoAsDone);
+router.post('/:id/cancel', corsHandler, auth, todoController.cancelTodo);
+router.put('/:id', corsHandler, auth, todoController.changeStatus);
 
 module.exports = router;

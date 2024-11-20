@@ -1,3 +1,5 @@
+'use strict';
+
 const Todo = require('../models/todo');
 const mongoose = require('mongoose');
 
@@ -33,8 +35,9 @@ exports.getTodoById = async (req, res) => {
 
 exports.createTodo = async (req, res) => {
     try {
-        const { title, author, status } = req.body;
-        if (!title || !author || !status) {
+        const { title, status } = req.body;
+        const author = req.user._id;
+        if (!title || !status) {
             return res.status(400).json({ error: "Trūksta laukų užklausoje" });
         }
         const todo = new Todo({ title, author, status });
@@ -48,6 +51,8 @@ exports.createTodo = async (req, res) => {
 
 exports.changeStatus = async (req, res) => {
     try {
+        const id = req.params.id;
+
         if (!req.body.status) {
             return res.status(400).json({ error: "Trūksta statuso lauko" });
         }
@@ -56,16 +61,15 @@ exports.changeStatus = async (req, res) => {
         if (!todo) {
             return res.status(404).json({ error: "Elementas nerastas" });
         }
+        const { status } = req.body;
+        await Todo.findByIdAndUpdate(id, { status });
+        res.json({ message: "Statusas pakeistas" });
     } catch (err) {
         if (err.name === 'CastError' && err.kind === 'ObjectId') {
             return res.status(404).json({ error: "Elementas nerastas" });
         }
         return res.status(500).json({ error: "Klaida atnaujinant duomenis" });
     }
-    const id = req.params.id;
-    const { status } = req.body;
-    await Todo.findByIdAndUpdate(id, { status });
-    res.json({ message: "Statusas pakeistas" });
 };
 
 exports.updateTodo = async (req, res) => {
