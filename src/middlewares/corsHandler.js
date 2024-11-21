@@ -5,6 +5,19 @@ const ALLOWED_DOMAINS = [
     "api.example.com"
 ];
 
+/**
+ * Tarpinė programinė įranga (middleware) skirta tvarkyti Tarpdomeninius išteklių 
+ * bendrinimo (CORS) užklausas.
+ * 
+ * Ši funkcija tikrina įeinančios užklausos 'Origin' antraštę, kad nustatytų, ar 
+ * užklausos kilmės domenas yra tarp leidžiamų domenų. Jei domenas yra leidžiamas, 
+ * nustatomos atitinkamos CORS antraštės, kurios leidžia užklausą. Taip pat tvarkomi 
+ * išankstiniai OPTIONS užklausų tipai, į kuriuos atsakoma su 200 būsenos kodu.
+ * 
+ * @param {Object} req - HTTP užklausos objektas, kuriame saugoma visa užklausos informacija
+ * @param {Object} res - HTTP atsakymo objektas, naudojamas siųsti atsakymą
+ * @param {Function} next - Funkcija, perduodanti valdymą kitai tarpinei programinei įrangai
+ */
 const corsHandler = (req, res, next) => {
     const origin = req.headers.origin;
     
