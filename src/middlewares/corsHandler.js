@@ -1,18 +1,35 @@
-let ALLOWED_ORIGINS = ["http://localhost:8080"];
+const ALLOWED_DOMAINS = [
+    "localhost",
+    "127.0.0.1",
+    "example.com",
+    "api.example.com"
+];
 
 const corsHandler = (req, res, next) => {
-    let origin = req.headers.origin;
-    let theOrigin = (ALLOWED_ORIGINS.includes(origin)) ? origin : ALLOWED_ORIGINS[0];
-
-    res.header("Access-Control-Allow-Origin", theOrigin);
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-
-    if (req.method === 'OPTIONS') {
-        res.sendStatus(204);
-    } else {
-        next();
+    const origin = req.headers.origin;
+    
+    if (origin) {
+        try {
+            const url = new URL(origin);
+            const hostname = url.hostname;
+            
+            if (ALLOWED_DOMAINS.includes(hostname)) {
+                res.header("Access-Control-Allow-Origin", origin);
+                res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+                res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+                res.header("Access-Control-Allow-Credentials", "true");
+            }
+        } catch (error) {
+            console.error("Invalid origin:", origin);
+        }
     }
+
+    // Handle preflight requests
+    if (req.method === "OPTIONS") {
+        return res.status(200).end();
+    }
+
+    next();
 };
 
 module.exports = corsHandler;

@@ -6,9 +6,10 @@ const mongoose = require('mongoose');
 exports.getAllTodos = async (req, res) => {
     try {
         const todos = await Todo.find({});
-        res.json(todos);
+        return res.json(todos);
     } catch (err) {
-        res.status(500).json({ error: "Klaida skaitant duomenis" });
+        console.error('Error in getAllTodos:', err);
+        return res.status(500).json({ error: "Klaida skaitant duomenis" });
     }
 };
 
