@@ -1,3 +1,7 @@
+// Tarpdomeninio išteklių bendrinimo (CORS) tvarkymo tarpinė programinė įranga
+// Šis modulis tvarko CORS užklausas, leidžia tik tas, kurios ateina iš leidžiamų domenų.
+// Jis nustato atitinkamas CORS antraštes ir tvarko išankstines OPTIONS užklausas.
+
 const ALLOWED_DOMAINS = [
     "localhost",
     "127.0.0.1",
@@ -33,13 +37,14 @@ const corsHandler = (req, res, next) => {
                 res.header("Access-Control-Allow-Credentials", "true");
             }
         } catch (error) {
-            console.error("Invalid origin:", origin);
+            console.error("Netinkamas kilmės adresas:", origin);
         }
     }
 
-    // Handle preflight requests
+    // Tvarkyti išankstines užklausas
     if (req.method === "OPTIONS") {
-        return res.status(200).end();
+        res.sendStatus(200);
+        return;
     }
 
     next();

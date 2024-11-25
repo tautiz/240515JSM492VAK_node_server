@@ -1,3 +1,7 @@
+// Kešavimo tarpinė programinė įranga
+// Šis modulis naudoja NodeCache biblioteką, kad kešuotų HTTP atsakymus.
+// Jei užklausa jau yra keše, grąžinamas kešuotas atsakymas, kitaip atsakymas įrašomas į kešą.
+
 const NodeCache = require('node-cache');
 const cache = new NodeCache({ stdTTL: 100, checkperiod: 120 });
 

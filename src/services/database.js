@@ -1,3 +1,8 @@
+// Duomenų bazės paslauga
+// Šis modulis nustato ryšį su MongoDB duomenų baze naudojant Mongoose.
+// Jis naudoja aplinkos kintamuosius prisijungimo informacijai gauti ir bando prisijungti prie duomenų bazės.
+// Jei prisijungimas sėkmingas, išvedamas atitinkamas pranešimas. Jei nepavyksta prisijungti, išvedama klaida ir procesas nutraukiamas.
+
 'use strict';
 
 const mongoose = require('mongoose');
