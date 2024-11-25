@@ -5,11 +5,27 @@ const mongoose = require('mongoose');
 
 exports.getAllTodos = async (req, res) => {
     try {
-        const todos = await Todo.find({});
-        return res.json(todos);
-    } catch (err) {
-        console.error('Error in getAllTodos:', err);
-        return res.status(500).json({ error: "Klaida skaitant duomenis" });
+        let query = { userId: req.user._id };
+        
+        // Jei vartotojas yra manager, pridedame team todos
+        if (req.user.role === 'manager') {
+            query = {
+                $or: [
+                    { userId: req.user._id },
+                    { teamId: req.user.teamId }
+                ]
+            };
+        }
+        
+        // Jei vartotojas yra admin, grąžiname visus todos
+        if (req.user.role === 'admin') {
+            query = {};
+        }
+        
+        const todos = await Todo.find(query);
+        res.json(todos);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 };
 
@@ -37,11 +53,11 @@ exports.getTodoById = async (req, res) => {
 exports.createTodo = async (req, res) => {
     try {
         const { title, status } = req.body;
-        const author = req.user._id;
+        const vartotojoId = req.user._id;
         if (!title || !status) {
             return res.status(400).json({ error: "Trūksta laukų užklausoje" });
         }
-        const todo = new Todo({ title, author, status });
+        const todo = new Todo({ title, status, userId: vartotojoId });
         await todo.save();
         res.status(201).json(todo);
     } catch (err) {

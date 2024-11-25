@@ -35,7 +35,7 @@ exports.login = async (req, res) => {
             return res.status(401).json({ message: 'Neteisingi prisijungimo duomenys' });
         }
 
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1minutes' });
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1hour' });
         user.token = token;
         await user.save();
         res.json({ token });

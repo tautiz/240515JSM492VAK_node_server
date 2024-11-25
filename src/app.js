@@ -5,6 +5,7 @@
  */
 const express = require('express');
 const mongoose = require('mongoose');
+const auth = require('./middlewares/auth');
 
 /**
  * Aplikacijos maršrutų (routes) importavimas
@@ -57,7 +58,7 @@ app.use((req, res, next) => {
  * /todo - užduočių valdymo maršrutai
  */
 app.use('/auth', authRoutes);
-app.use('/todo', todoRoutes);
+app.use('/todo', auth, todoRoutes);
 
 /**
  * Sistemos būsenos tikrinimo maršrutas
