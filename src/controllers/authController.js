@@ -1,8 +1,8 @@
 'use strict';
 
-const User = require('../models/user');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const userRepository = require('../repositories/userRepository');
+const authRepository = require('../repositories/authRepository');
 
 exports.register = async (req, res) => {
     try {
@@ -10,14 +10,24 @@ exports.register = async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({ error: "Trūksta laukų užklausoje" });
         }
-        const existingUser = await User.findOne({ email });
+
+        const existingUser = await userRepository.findByEmail(email);
         if (existingUser) {
             return res.status(400).json({ error: "Toks vartotojas jau egzistuoja" });
         }
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = new User({ email, password: hashedPassword });
-        await user.save();
-        res.status(201).json(user);
+        const user = await userRepository.create({ 
+            email, 
+            password: hashedPassword,
+            role: 'user' // numatytoji rolė naujiems vartotojams
+        });
+
+        res.status(201).json({ 
+            id: user._id,
+            email: user.email,
+            role: user.role
+        });
     } catch (err) {
         res.status(500).json({ error: "Klaida išsaugant duomenis: " + err.toString() });
     }
@@ -30,16 +40,23 @@ exports.login = async (req, res) => {
             return res.status(400).json({ error: "Trūksta laukų užklausoje" });
         }
 
-        const user = await User.findOne({ email });
+        const user = await userRepository.findByEmail(email);
         if (!user || !bcrypt.compareSync(password, user.password)) {
             return res.status(401).json({ message: 'Neteisingi prisijungimo duomenys' });
         }
 
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1hour' });
-        user.token = token;
-        await user.save();
-        res.json({ token });
+        const token = authRepository.generateToken({ userId: user._id });
+        await userRepository.updateToken(user._id, token);
+
+        res.json({ 
+            token,
+            user: {
+                id: user._id,
+                email: user.email,
+                role: user.role
+            }
+        });
     } catch (err) {
-        res.status(500).json({ error: "Klaida jungiantis i sistema "});
+        res.status(500).json({ error: "Klaida jungiantis į sistemą: " + err.toString() });
     }
 };
