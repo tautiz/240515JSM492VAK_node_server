@@ -1,8 +1,8 @@
 // Importuojame reikalingus modulius
 'use strict';
 
-const Todo = require('../models/todo'); // Importuojame Todo modelį, kuris leidžia sąveikauti su duomenų baze
-const mongoose = require('mongoose'); // Importuojame mongoose, kuris padeda valdyti MongoDB duomenų bazę
+const todoRepository = require('../repositories/todoRepository');
+const mongoose = require('mongoose');
 
 /**
  * Gauti visas užduotis
@@ -10,28 +10,23 @@ const mongoose = require('mongoose'); // Importuojame mongoose, kuris padeda val
  */
 exports.getAllTodos = async (req, res) => {
     try {
-        // Pradinė užklausa, kuri grąžins tik tas užduotis, kurios priklauso prisijungusiam vartotojui
-        let query = { userId: req.user._id };
-        
-        // Jei vartotojas yra manager, pridedame team todos
-        if (req.user.role === 'manager') {
-            query = {
-                $or: [
-                    { userId: req.user._id }, // Vartotojo užduotys
-                    { teamId: req.user.teamId } // Komandos užduotys
-                ]
-            };
+        let todos;
+        const user = req.user;
+
+        switch (user.role) {
+            case 'admin':
+                todos = await todoRepository.findAllTodos();
+                break;
+            case 'manager':
+                todos = await todoRepository.findTeamTodos(user.teamId);
+                break;
+            default:
+                todos = await todoRepository.findUserTodos(user._id);
         }
-        
-        // Jei vartotojas yra admin, grąžiname visus todos
-        if (req.user.role === 'admin') {
-            query = {}; // Tuščia užklausa grąžina visas užduotis
-        }
-        
-        const todos = await Todo.find(query); // Vykdome užklausą į duomenų bazę
-        res.json(todos); // Grąžiname užduotis kaip JSON atsakymą
+
+        res.json(todos);
     } catch (error) {
-        res.status(500).json({ error: error.message }); // Klaidos atveju grąžiname klaidos pranešimą
+        res.status(500).json({ error: error.message });
     }
 };
 
@@ -40,27 +35,25 @@ exports.getAllTodos = async (req, res) => {
  * Ši funkcija grąžina konkrečią užduotį, jei vartotojas turi teisę ją matyti
  */
 exports.getTodoById = async (req, res) => {
-    const id = req.params.id; // Gauname užduoties ID iš užklausos parametrų
+    const id = req.params.id;
     try {
-        // Tikriname ar ID yra tinkamo tipo
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(404).json({ error: "Netinkamas ID tipas" });
         }
-        const todo = await Todo.findById(id); // Ieškome užduoties pagal ID
+
+        const todo = await todoRepository.findTodoWithOwner(id);
         if (!todo) {
             return res.status(404).json({ error: "Elementas nerastas" });
         }
 
-        // ACL patikrinimas
-        if (req.user.role !== 'admin' && todo.userId.toString() !== req.user._id.toString()) {
+        if (req.user.role !== 'admin' && todo.userId._id.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: "Nėra teisių peržiūrėti šią užduotį" });
         }
 
-        res.json(todo); // Grąžiname užduotį kaip JSON atsakymą
+        res.json(todo);
     } catch (err) {
         if (err.name === 'CastError' && err.kind === 'ObjectId') {
-            res.status(404).json({ error: "Elementas nerastas" });
-            return;
+            return res.status(404).json({ error: "Elementas nerastas" });
         }
         res.status(500).json({ error: "Klaida skaitant duomenis" });
     }
@@ -72,18 +65,23 @@ exports.getTodoById = async (req, res) => {
  */
 exports.createTodo = async (req, res) => {
     try {
-        const { title, status } = req.body; // Gauname užduoties pavadinimą ir būseną iš užklausos kūno
-        const vartotojoId = req.user._id; // Gauname prisijungusio vartotojo ID
+        const { title, status } = req.body;
         if (!title || !status) {
             return res.status(400).json({ error: "Trūksta laukų užklausoje" });
         }
-        const todo = new Todo({ title, status, userId: vartotojoId }); // Sukuriame naują užduotį
-        await todo.save(); // Išsaugome užduotį į duomenų bazę
-        res.status(201).json(todo); // Grąžiname sukurtą užduotį kaip JSON atsakymą
+
+        const todoData = {
+            title,
+            status,
+            userId: req.user._id,
+            teamId: req.user.teamId
+        };
+
+        const todo = await todoRepository.createTodo(todoData);
+        res.status(201).json(todo);
     } catch (err) {
         res.status(500).json({ error: "Klaida išsaugant duomenis: " + err.toString() });
     }
-
 };
 
 /**
@@ -92,30 +90,24 @@ exports.createTodo = async (req, res) => {
  */
 exports.changeStatus = async (req, res) => {
     try {
-        const id = req.params.id; // Gauname užduoties ID iš užklausos parametrų
-
+        const id = req.params.id;
         if (!req.body.status) {
             return res.status(400).json({ error: "Trūksta statuso lauko" });
         }
 
-        const todo = await Todo.findById(id); // Ieškome užduoties pagal ID
+        const todo = await todoRepository.findById(id);
         if (!todo) {
             return res.status(404).json({ error: "Elementas nerastas" });
         }
 
-        // ACL patikrinimas
         if (req.user.role !== 'admin' && todo.userId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ error: "Nėra teisių keisti šios užduoties būseną" });
+            return res.status(403).json({ error: "Nėra teisių keisti šios užduoties" });
         }
 
-        const { status } = req.body; // Gauname naują būseną iš užklausos kūno
-        await Todo.findByIdAndUpdate(id, { status }); // Atnaujiname užduoties būseną duomenų bazėje
-        res.json({ message: "Statusas pakeistas" }); // Grąžiname atsakymą, kad būsena pakeista
+        const updatedTodo = await todoRepository.updateTodo(id, { status: req.body.status });
+        res.json(updatedTodo);
     } catch (err) {
-        if (err.name === 'CastError' && err.kind === 'ObjectId') {
-            return res.status(404).json({ error: "Elementas nerastas" });
-        }
-        return res.status(500).json({ error: "Klaida atnaujinant duomenis" });
+        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
     }
 };
 
@@ -124,64 +116,21 @@ exports.changeStatus = async (req, res) => {
  * Ši funkcija leidžia vartotojui atnaujinti užduoties informaciją
  */
 exports.updateTodo = async (req, res) => {
-    const id = req.params.id; // Gauname užduoties ID iš užklausos parametrų
     try {
-        const todo = await Todo.findById(id); // Ieškome užduoties pagal ID
-        if (!todo) {
-            return res.status(404).json({ error: "Elementas nerastas" });
-        }
-
-        // ACL patikrinimas
-        if (req.user.role !== 'admin' && todo.userId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ error: "Nėra teisių redaguoti šią užduotį" });
-        }
-
-        const { title, status } = req.body; // Gauname naują pavadinimą ir būseną iš užklausos kūno
-        if (!title || !status) {
-            return res.status(400).json({ error: "Trūksta laukų užklausoje" });
-        }
-
-        todo.title = title; // Atnaujiname užduoties pavadinimą
-        todo.status = status; // Atnaujiname užduoties būseną
-
-        await todo.save(); // Išsaugome pakeitimus į duomenų bazę
-        res.json({ message: "Elementas atnaujintas", data: todo }); // Grąžiname atnaujintą užduotį kaip JSON atsakymą
-    } catch (err) {
-        if (err.name === 'CastError' && err.kind === 'ObjectId') {
-            return res.status(404).json({ error: "Elementas nerastas"});
-        }
-        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
-    }
-};
-
-/**
- * Dalinai atnaujinti užduotį
- * Ši funkcija leidžia vartotojui dalinai atnaujinti užduoties informaciją
- */
-exports.partialUpdateTodo = async (req, res) => {
-    const id = req.params.id; // Gauname užduoties ID iš užklausos parametrų
-    try {
-        const todo = await Todo.findById(id); // Ieškome užduoties pagal ID
-        if (!todo) {
-            return res.status(404).json({ error: "Elementas nerastas" });
-        }
-
-        // ACL patikrinimas
-        if (req.user.role !== 'admin' && todo.userId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ error: "Nėra teisių redaguoti šią užduotį" });
-        }
-
-        const { title, status } = req.body; // Gauname naują pavadinimą ir būseną iš užklausos kūno
+        const id = req.params.id;
+        const todo = await todoRepository.findById(id);
         
-        if (title) todo.title = title; // Atnaujiname užduoties pavadinimą, jei pateiktas
-        if (status) todo.status = status; // Atnaujiname užduoties būseną, jei pateikta
-
-        await todo.save(); // Išsaugome pakeitimus į duomenų bazę
-        res.json({ message: "Elementas dalinai atnaujintas", data: todo }); // Grąžiname atnaujintą užduotį kaip JSON atsakymą
-    } catch (err) {
-        if (err.name === 'CastError' && err.kind === 'ObjectId') {
-            return res.status(404).json({ error: "Elementas nerastas"});
+        if (!todo) {
+            return res.status(404).json({ error: "Elementas nerastas" });
         }
+
+        if (req.user.role !== 'admin' && todo.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: "Nėra teisių atnaujinti šią užduotį" });
+        }
+
+        const updatedTodo = await todoRepository.updateTodo(id, req.body);
+        res.json(updatedTodo);
+    } catch (err) {
         res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
     }
 };
@@ -191,24 +140,21 @@ exports.partialUpdateTodo = async (req, res) => {
  * Ši funkcija leidžia vartotojui ištrinti užduotį
  */
 exports.deleteTodo = async (req, res) => {
-    const id = req.params.id; // Gauname užduoties ID iš užklausos parametrų
     try {
-        const todo = await Todo.findById(id); // Ieškome užduoties pagal ID
+        const id = req.params.id;
+        const todo = await todoRepository.findById(id);
+
         if (!todo) {
             return res.status(404).json({ error: "Elementas nerastas" });
         }
 
-        // ACL patikrinimas
         if (req.user.role !== 'admin' && todo.userId.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: "Nėra teisių ištrinti šią užduotį" });
         }
 
-        await Todo.findByIdAndDelete(id); // Ištriname užduotį iš duomenų bazės
-        res.json({ message: "Elementas ištrintas", data: todo }); // Grąžiname atsakymą, kad užduotis ištrinta
+        await todoRepository.delete(id);
+        res.status(204).send();
     } catch (err) {
-        if (err.name === 'CastError' && err.kind === 'ObjectId') {
-            return res.status(404).json({ error: "Elementas nerastas"});
-        }
         res.status(500).json({ error: "Klaida trinant duomenis: " + err.toString() });
     }
 };
@@ -218,27 +164,22 @@ exports.deleteTodo = async (req, res) => {
  * Ši funkcija leidžia vartotojui pažymėti užduotį kaip atliktą
  */
 exports.markTodoAsDone = async (req, res) => {
-    const id = req.params.id; // Gauname užduoties ID iš užklausos parametrų
     try {
-        const todo = await Todo.findById(id); // Ieškome užduoties pagal ID
+        const id = req.params.id;
+        const todo = await todoRepository.findById(id);
+
         if (!todo) {
             return res.status(404).json({ error: "Elementas nerastas" });
         }
 
-        // ACL patikrinimas
         if (req.user.role !== 'admin' && todo.userId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ error: "Nėra teisių keisti šios užduoties būseną" });
+            return res.status(403).json({ error: "Nėra teisių keisti šios užduoties" });
         }
 
-        todo.status = 'done'; // Atnaujiname užduoties būseną į 'done'
-        await todo.save(); // Išsaugome pakeitimus į duomenų bazę
-        
-        res.json({ message: "Užduotis pažymėta kaip atlikta", data: todo }); // Grąžiname atnaujintą užduotį kaip JSON atsakymą
+        const updatedTodo = await todoRepository.updateTodo(id, { status: 'done' });
+        res.json(updatedTodo);
     } catch (err) {
-        if (err.name === 'CastError' && err.kind === 'ObjectId') {
-            return res.status(404).json({ error: "Elementas nerastas"});
-        }
-        res.status(500).json({ error: "Klaida atnaujinant statusą: " + err.toString() });
+        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
     }
 };
 
@@ -247,26 +188,21 @@ exports.markTodoAsDone = async (req, res) => {
  * Ši funkcija leidžia vartotojui atšaukti užduotį
  */
 exports.cancelTodo = async (req, res) => {
-    const id = req.params.id; // Gauname užduoties ID iš užklausos parametrų
     try {
-        const todo = await Todo.findById(id); // Ieškome užduoties pagal ID
+        const id = req.params.id;
+        const todo = await todoRepository.findById(id);
+
         if (!todo) {
             return res.status(404).json({ error: "Elementas nerastas" });
         }
 
-        // ACL patikrinimas
         if (req.user.role !== 'admin' && todo.userId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ error: "Nėra teisių atšaukti šios užduoties" });
+            return res.status(403).json({ error: "Nėra teisių keisti šios užduoties" });
         }
 
-        todo.status = 'cancelled'; // Atnaujiname užduoties būseną į 'cancelled'
-        await todo.save(); // Išsaugome pakeitimus į duomenų bazę
-        
-        res.json({ message: "Užduotis atšaukta", data: todo }); // Grąžiname atnaujintą užduotį kaip JSON atsakymą
+        const updatedTodo = await todoRepository.updateTodo(id, { status: 'cancelled' });
+        res.json(updatedTodo);
     } catch (err) {
-        if (err.name === 'CastError' && err.kind === 'ObjectId') {
-            return res.status(404).json({ error: "Elementas nerastas"});
-        }
-        res.status(500).json({ error: "Klaida atšaukiant užduotį: " + err.toString() });
+        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
     }
 };

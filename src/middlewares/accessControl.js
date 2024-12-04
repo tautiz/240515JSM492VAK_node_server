@@ -1,6 +1,6 @@
 'use strict';
 
-const Todo = require('../models/todo');
+const todoRepository = require('../repositories/todoRepository');
 
 class AccessControl {
     constructor() {
@@ -17,7 +17,7 @@ class AccessControl {
     }
 
     async verifyResourceOwnership(userId, todoId) {
-        const todo = await Todo.findById(todoId);
+        const todo = await todoRepository.findById(todoId);
         return todo && todo.userId.toString() === userId.toString();
     }
 
