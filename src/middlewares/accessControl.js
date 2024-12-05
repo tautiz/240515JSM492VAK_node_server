@@ -9,6 +9,11 @@ class AccessControl {
             manager: ['read_own_todos', 'read_team_todos', 'create_todo', 'update_team_todo', 'delete_team_todo'],
             admin: ['read_all_todos', 'create_todo', 'update_any_todo', 'delete_any_todo']
         };
+        
+        // Bind methods to ensure proper 'this' context
+        this.hasPermission = this.hasPermission.bind(this);
+        this.verifyResourceOwnership = this.verifyResourceOwnership.bind(this);
+        this.checkPermission = this.checkPermission.bind(this);
     }
 
     hasPermission(userRole, requiredPermission) {
@@ -24,8 +29,7 @@ class AccessControl {
     checkPermission(requiredPermission) {
         return async (req, res, next) => {
             try {
-                const user = req.user;
-                
+                const user = req.user;                
                 if (!this.hasPermission(user.role, requiredPermission)) {
                     return res.status(403).json({
                         error: 'Nepakankami leidimai'
