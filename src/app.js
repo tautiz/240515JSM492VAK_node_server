@@ -40,6 +40,9 @@ app.use(corsHandler);
  * Importuojame ir iškviečiame prisijungimo funkciją
  */
 const connectToDatabase = require('./services/database');
+const errorHandler = require('./middlewares/errorHandler');
+const AppError = require('./utils/errors/AppError');
+const { VALIDATION_ERROR } = require('./utils/errors/errorTypes');
 connectToDatabase();
 
 /**
@@ -68,6 +71,7 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', message: 'Sistema veikia' });
 });
 
+
 /**
  * Klaidų valdymas
  * 404 klaidos tvarkymas - kai užklausa neatitinka jokio apibrėžto maršruto
@@ -86,3 +90,5 @@ mongoose.connection.once('open', () => {
         console.log(`Serveris veikia ant ${port} porto`);
     });
 });
+
+app.use(errorHandler);
