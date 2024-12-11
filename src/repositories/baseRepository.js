@@ -1,3 +1,4 @@
+const AppError = require('../utils/errors/AppError');
 // Base repository klasė, kuri suteikia pagrindinius CRUD metodus
 'use strict';
 
@@ -11,7 +12,11 @@ class BaseRepository {
     }
 
     async findById(id) {
-        return this.model.findById(id);
+        const result = await this.model.findById(id);
+        if (!result) {
+            throw new AppError('Todo elementas nerastas', 404);
+        }
+        return result;
     }
 
     async create(data) {
@@ -23,7 +28,11 @@ class BaseRepository {
     }
 
     async delete(id) {
-        return this.model.findByIdAndDelete(id);
+        const result = await this.model.findByIdAndDelete(id);
+        if (!result) {
+            throw new AppError('Todo elementas nerastas', 404);
+        }
+        return result;
     }
 }
 

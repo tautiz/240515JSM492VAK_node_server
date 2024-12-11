@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
  * Gauti visas užduotis
  * Ši funkcija grąžina visas užduotis, kurias vartotojas turi teisę matyti
  */
-exports.getAllTodos = async (req, res) => {
+exports.getAllTodos = async (req, res, next) => {
     try {
         let todos;
         const user = req.user;
@@ -26,7 +26,7 @@ exports.getAllTodos = async (req, res) => {
 
         res.json(todos);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 };
 
@@ -34,7 +34,7 @@ exports.getAllTodos = async (req, res) => {
  * Gauti užduotį pagal ID
  * Ši funkcija grąžina konkrečią užduotį, jei vartotojas turi teisę ją matyti
  */
-exports.getTodoById = async (req, res) => {
+exports.getTodoById = async (req, res, next) => {
     const id = req.params.id;
     try {
         if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -52,10 +52,7 @@ exports.getTodoById = async (req, res) => {
 
         res.json(todo);
     } catch (err) {
-        if (err.name === 'CastError' && err.kind === 'ObjectId') {
-            return res.status(404).json({ error: "Elementas nerastas" });
-        }
-        res.status(500).json({ error: "Klaida skaitant duomenis" });
+        next(err);
     }
 };
 
@@ -63,7 +60,7 @@ exports.getTodoById = async (req, res) => {
  * Sukurti naują užduotį
  * Ši funkcija leidžia vartotojui sukurti naują užduotį
  */
-exports.createTodo = async (req, res) => {
+exports.createTodo = async (req, res, next) => {
     try {
         const { title, status } = req.body;
         if (!title || !status) {
@@ -80,7 +77,7 @@ exports.createTodo = async (req, res) => {
         const todo = await todoRepository.createTodo(todoData);
         res.status(201).json(todo);
     } catch (err) {
-        res.status(500).json({ error: "Klaida išsaugant duomenis: " + err.toString() });
+        next(err);
     }
 };
 
@@ -88,7 +85,7 @@ exports.createTodo = async (req, res) => {
  * Pakeisti užduoties būseną
  * Ši funkcija leidžia vartotojui pakeisti užduoties būseną
  */
-exports.changeStatus = async (req, res) => {
+exports.changeStatus = async (req, res, next) => {
     try {
         const id = req.params.id;
         if (!req.body.status) {
@@ -107,7 +104,7 @@ exports.changeStatus = async (req, res) => {
         const updatedTodo = await todoRepository.updateTodo(id, { status: req.body.status });
         res.json(updatedTodo);
     } catch (err) {
-        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
+        next(err);
     }
 };
 
@@ -115,7 +112,7 @@ exports.changeStatus = async (req, res) => {
  * Atnaujinti užduotį
  * Ši funkcija leidžia vartotojui atnaujinti užduoties informaciją
  */
-exports.updateTodo = async (req, res) => {
+exports.updateTodo = async (req, res, next) => {
     try {
         const id = req.params.id;
         const todo = await todoRepository.findById(id);
@@ -131,7 +128,7 @@ exports.updateTodo = async (req, res) => {
         const updatedTodo = await todoRepository.updateTodo(id, req.body);
         res.json(updatedTodo);
     } catch (err) {
-        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
+        next(err);
     }
 };
 
@@ -139,7 +136,7 @@ exports.updateTodo = async (req, res) => {
  * Ištrinti užduotį
  * Ši funkcija leidžia vartotojui ištrinti užduotį
  */
-exports.deleteTodo = async (req, res) => {
+exports.deleteTodo = async (req, res, next) => {
     try {
         const id = req.params.id;
         const todo = await todoRepository.findById(id);
@@ -155,7 +152,7 @@ exports.deleteTodo = async (req, res) => {
         await todoRepository.delete(id);
         res.status(204).send();
     } catch (err) {
-        res.status(500).json({ error: "Klaida trinant duomenis: " + err.toString() });
+        next(err); // Perduodame klaidą į error handling middleware
     }
 };
 
@@ -163,7 +160,7 @@ exports.deleteTodo = async (req, res) => {
  * Pažymėti užduotį kaip atliktą
  * Ši funkcija leidžia vartotojui pažymėti užduotį kaip atliktą
  */
-exports.markTodoAsDone = async (req, res) => {
+exports.markTodoAsDone = async (req, res, next) => {
     try {
         const id = req.params.id;
         const todo = await todoRepository.findById(id);
@@ -179,7 +176,7 @@ exports.markTodoAsDone = async (req, res) => {
         const updatedTodo = await todoRepository.updateTodo(id, { status: 'done' });
         res.json(updatedTodo);
     } catch (err) {
-        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
+        next(err);
     }
 };
 
@@ -187,7 +184,7 @@ exports.markTodoAsDone = async (req, res) => {
  * Atšaukti užduotį
  * Ši funkcija leidžia vartotojui atšaukti užduotį
  */
-exports.cancelTodo = async (req, res) => {
+exports.cancelTodo = async (req, res, next) => {
     try {
         const id = req.params.id;
         const todo = await todoRepository.findById(id);
@@ -203,6 +200,6 @@ exports.cancelTodo = async (req, res) => {
         const updatedTodo = await todoRepository.updateTodo(id, { status: 'cancelled' });
         res.json(updatedTodo);
     } catch (err) {
-        res.status(500).json({ error: "Klaida atnaujinant duomenis: " + err.toString() });
+        next(err);
     }
 };
