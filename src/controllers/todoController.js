@@ -12,16 +12,21 @@ exports.getAllTodos = async (req, res, next) => {
     try {
         let todos;
         const user = req.user;
+        const options = {
+            page: parseInt(req.query.page) || 1,
+            limit: parseInt(req.query.limit) || 10,
+            filter: req.query.filter || {}
+        };
 
         switch (user.role) {
             case 'admin':
-                todos = await todoRepository.findAllTodos();
+                todos = await todoRepository.findAllTodos(options);
                 break;
             case 'manager':
-                todos = await todoRepository.findTeamTodos(user.teamId);
+                todos = await todoRepository.findByTeam(user.teamId, options);
                 break;
             default:
-                todos = await todoRepository.findUserTodos(user._id);
+                todos = await todoRepository.findByUserId(user._id, options);
         }
 
         res.json(todos);

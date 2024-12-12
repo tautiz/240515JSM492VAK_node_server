@@ -14,7 +14,7 @@ class BaseRepository {
     async findById(id) {
         const result = await this.model.findById(id);
         if (!result) {
-            throw new AppError('Todo elementas nerastas', 404);
+            throw new AppError('Todo elementas nerastas ID: ' + id, 404);
         }
         return result;
     }
@@ -30,7 +30,7 @@ class BaseRepository {
     async delete(id) {
         const result = await this.model.findByIdAndDelete(id);
         if (!result) {
-            throw new AppError('Todo elementas nerastas', 404);
+            throw new AppError('Todo elementas nerastas ID: ' + id, 404);
         }
         return result;
     }
